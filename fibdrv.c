@@ -44,7 +44,7 @@ static void str_reverse(char *str, size_t n)
 
 static void string_number_add(char *a, char *b, char *out)
 {
-    int carry = 0, i = 0;
+    int carry = 0, sum, i = 0;
     size_t a_len = strlen(a), b_len = strlen(b);
     // Check string a is longer than string b
     if (a_len < b_len) {
