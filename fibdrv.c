@@ -6,6 +6,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/slab.h>
 
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
@@ -24,19 +25,70 @@ static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 
-static long long fib_sequence(long long k)
+#define XOR_SWAP(a, b, type) \
+    do {                     \
+        type *__c = (a);     \
+        type *__d = (b);     \
+        *__c ^= *__d;        \
+        *__d ^= *__c;        \
+        *__c ^= *__d;        \
+    } while (0)
+
+
+
+static void str_reverse(char *str, size_t n)
 {
-    /* FIXME: C99 variable-length array (VLA) is not allowed in Linux kernel. */
-    long long f[k + 2];
+    for (int i = 0; i < n / 2; i++)
+        XOR_SWAP(&str[i], &str[n - i - 1], char);
+}
 
-    f[0] = 0;
-    f[1] = 1;
-
-    for (int i = 2; i <= k; i++) {
-        f[i] = f[i - 1] + f[i - 2];
+static void string_number_add(char *a, char *b, char *out)
+{
+    int carry = 0, i = 0;
+    size_t a_len = strlen(a), b_len = strlen(b);
+    // Check string a is longer than string b
+    if (a_len < b_len) {
+        XOR_SWAP(a, b, char);
+        XOR_SWAP(&a_len, &b_len, size_t);
+    }
+    for (i = 0; i < b_len; i++) {
+        sum = (a[i] - '0') + (b[i] - '0') + carry;
+        out[i] = (sum % 10) + '0';
+        carry = sum / 10;
+    }
+    for (i = b_len; i < a_len; i++) {
+        sum = (a[i] - '0') + carry;
+        out[i] = (sum % 10) + '0';
+        carry = sum / 10;
     }
 
-    return f[k];
+    if (carry)
+        out[i++] = carry + '0';
+    out[i] = '\0';
+}
+
+typedef struct str {
+    char numstr[256];
+} str_t;
+
+static long long fib_sequence(long long k, char *buf)
+{
+    /* FIXME: C99 variable-length array (VLA) is not allowed in Linux kernel. */
+    int i = 0;
+    str_t *f = kmalloc((k + 2) * sizeof(str_t), GFP_KERNEL);
+    strncpy(f[0].numstr, "0", 1);
+    f[0].numstr[1] = '\0';
+    strncpy(f[1].numstr, "1", 1);
+    f[1].numstr[1] = '\0';
+
+    for (i = 2; i <= k; i++) {
+        string_number_add(f[i - 1].numstr, f[i - 2].numstr, f[i].numstr);
+    }
+    size_t f_size = strlen(f[k].numstr);
+    str_reverse(f[k].numstr, f_size);
+    if (copy_to_user(buf, f[k].numstr, f_size))
+        return -EFAULT;
+    return f_size;
 }
 
 static int fib_open(struct inode *inode, struct file *file)
@@ -60,7 +112,7 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    return (ssize_t) fib_sequence(*offset);
+    return (ssize_t) fib_sequence(*offset, buf);
 }
 
 /* write operation is skipped */
