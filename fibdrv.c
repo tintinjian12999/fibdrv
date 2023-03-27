@@ -4,9 +4,11 @@
 #include <linux/init.h>
 #include <linux/kdev_t.h>
 #include <linux/kernel.h>
+#include <linux/ktime.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+
 
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
@@ -24,6 +26,7 @@ static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
+static ktime_t kt;
 
 #define XOR_SWAP(a, b, type) \
     do {                     \
@@ -33,12 +36,26 @@ static DEFINE_MUTEX(fib_mutex);
         *__d ^= *__c;        \
         *__c ^= *__d;        \
     } while (0)
+/*
+static long long fib_sequence(long long k, char *buf)
+{
+    long long *f = kmalloc((k + 2) * sizeof(long long), GFP_KERNEL);
 
+    f[0] = 0;
+    f[1] = 1;
+
+    for (int i = 2; i <= k; i++) {
+        f[i] = f[i - 1] + f[i - 2];
+    }
+
+    return f[k];
+}
+*/
 
 
 static void str_reverse(char *str, size_t n)
 {
-    for (int i = 0; i < n / 2; i++)
+    for (int i = 0; i < (n >> 1); i++)
         XOR_SWAP(&str[i], &str[n - i - 1], char);
 }
 
@@ -73,7 +90,6 @@ typedef struct str {
 
 static long long fib_sequence(long long k, char *buf)
 {
-    /* FIXME: C99 variable-length array (VLA) is not allowed in Linux kernel. */
     int i = 0;
     str_t *f = kmalloc((k + 2) * sizeof(str_t), GFP_KERNEL);
     strncpy(f[0].numstr, "0", 1);
@@ -89,6 +105,14 @@ static long long fib_sequence(long long k, char *buf)
     if (copy_to_user(buf, f[k].numstr, f_size))
         return -EFAULT;
     return f_size;
+}
+
+static long long fib_time_proxy(long long k, char *buf)
+{
+    kt = ktime_get();
+    long long result = fib_sequence(k, buf);
+    kt = ktime_sub(ktime_get(), kt);
+    return result;
 }
 
 static int fib_open(struct inode *inode, struct file *file)
@@ -112,7 +136,7 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    return (ssize_t) fib_sequence(*offset, buf);
+    return (ssize_t) fib_time_proxy(*offset, buf);
 }
 
 /* write operation is skipped */
@@ -121,7 +145,7 @@ static ssize_t fib_write(struct file *file,
                          size_t size,
                          loff_t *offset)
 {
-    return 1;
+    return ktime_to_ns(kt);
 }
 
 static loff_t fib_device_lseek(struct file *file, loff_t offset, int orig)
