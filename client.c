@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,16 +26,16 @@ int main()
     for (int i = 0; i <= offset; i++) {
         lseek(fd, i, SEEK_SET);
         clock_gettime(CLOCK_MONOTONIC, &t1);
-        long long sz = read(fd, buf, sizeof(buf));
+        uint64_t sz = read(fd, buf, sizeof(buf));
         clock_gettime(CLOCK_MONOTONIC, &t2);
         long long krtime = write(fd, write_buf, strlen(write_buf));
         long long user_time =
             (t2.tv_sec - t1.tv_sec) * 1E9 + (t2.tv_nsec - t1.tv_nsec);
         printf("Reading from " FIB_DEV
-               " at offset %d, returned the sequence %s, krtime is %lld, user "
-               "time is %lld, string size is %lld"
+               " at offset %d, returned the sequence %lu, krtime is %lld, user "
+               "time is %lld, string size is %lu"
                "\n",
-               i, buf, krtime, user_time, sz);
+               i, sz, krtime, user_time, sz);
         fprintf(fptr, "%d %lld %lld %lld \n", i, krtime, user_time,
                 user_time - krtime);
     }

@@ -36,8 +36,19 @@ static ktime_t kt;
         *__d ^= *__c;        \
         *__c ^= *__d;        \
     } while (0)
+static uint64_t fast_doubling(uint32_t target)
+{
+    if (target <= 2)
+        return 1;
+    uint64_t n = fast_doubling(target >> 1);
+    uint64_t n1 = fast_doubling((target >> 1) + 1);
+    if (target & 1)
+        return n * n + n1 * n1;
+    return n * ((n1 << 1) - n);
+}
+
 /*
-static long long fib_sequence(long long k, char *buf)
+static uint64_t fib_sequence(long long k, char *buf)
 {
     long long *f = kmalloc((k + 2) * sizeof(long long), GFP_KERNEL);
 
@@ -52,7 +63,7 @@ static long long fib_sequence(long long k, char *buf)
 }
 */
 
-
+/*
 static void str_reverse(char *str, size_t n)
 {
     for (int i = 0; i < (n >> 1); i++)
@@ -106,11 +117,11 @@ static long long fib_sequence(long long k, char *buf)
         return -EFAULT;
     return f_size;
 }
-
-static long long fib_time_proxy(long long k, char *buf)
+*/
+static uint64_t fib_time_proxy(long long k, char *buf)
 {
     kt = ktime_get();
-    long long result = fib_sequence(k, buf);
+    long long result = fast_doubling(k);
     kt = ktime_sub(ktime_get(), kt);
     return result;
 }
@@ -136,7 +147,7 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    return (ssize_t) fib_time_proxy(*offset, buf);
+    return (uint64_t) fib_time_proxy(*offset, buf);
 }
 
 /* write operation is skipped */
