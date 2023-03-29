@@ -17,10 +17,8 @@ MODULE_VERSION("0.1");
 
 #define DEV_FIBONACCI_NAME "fibonacci"
 
-/* MAX_LENGTH is set to 92 because
- * ssize_t can't fit the number > 92
- */
-#define MAX_LENGTH 92
+
+#define MAX_LENGTH 10000
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
@@ -36,17 +34,18 @@ static ktime_t kt;
         *__d ^= *__c;        \
         *__c ^= *__d;        \
     } while (0)
+/*
 static uint64_t fast_doubling(uint32_t target)
 {
-    if (target <= 2)
+    if(target <= 2)
         return 1;
     uint64_t n = fast_doubling(target >> 1);
     uint64_t n1 = fast_doubling((target >> 1) + 1);
-    if (target & 1)
+    if(target & 1)
         return n * n + n1 * n1;
     return n * ((n1 << 1) - n);
 }
-
+*/
 /*
 static uint64_t fib_sequence(long long k, char *buf)
 {
@@ -63,7 +62,7 @@ static uint64_t fib_sequence(long long k, char *buf)
 }
 */
 
-/*
+
 static void str_reverse(char *str, size_t n)
 {
     for (int i = 0; i < (n >> 1); i++)
@@ -103,9 +102,9 @@ static long long fib_sequence(long long k, char *buf)
 {
     int i = 0;
     str_t *f = kmalloc((k + 2) * sizeof(str_t), GFP_KERNEL);
-    strncpy(f[0].numstr, "0", 1);
+    f[0].numstr[0] = '0';
     f[0].numstr[1] = '\0';
-    strncpy(f[1].numstr, "1", 1);
+    f[1].numstr[0] = '1';
     f[1].numstr[1] = '\0';
 
     for (i = 2; i <= k; i++) {
@@ -113,15 +112,15 @@ static long long fib_sequence(long long k, char *buf)
     }
     size_t f_size = strlen(f[k].numstr);
     str_reverse(f[k].numstr, f_size);
-    if (copy_to_user(buf, f[k].numstr, f_size))
+    if (copy_to_user(buf, f[k].numstr, f_size + 1))
         return -EFAULT;
     return f_size;
 }
-*/
+
 static uint64_t fib_time_proxy(long long k, char *buf)
 {
     kt = ktime_get();
-    long long result = fast_doubling(k);
+    long long result = fib_sequence(k, buf);
     kt = ktime_sub(ktime_get(), kt);
     return result;
 }

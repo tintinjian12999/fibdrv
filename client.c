@@ -13,7 +13,7 @@ int main()
 {
     char buf[256];
     char write_buf[] = "testing writing";
-    int offset = 92; /* TODO: try test something bigger than the limit */
+    int offset = 500; /* TODO: try test something bigger than the limit */
     int fd = open(FIB_DEV, O_RDWR);
     if (fd < 0) {
         perror("Failed to open character device");
@@ -21,7 +21,9 @@ int main()
     }
     struct timespec t1, t2;
     FILE *fptr = fopen("output.txt", "w");
-    ;
+    for (int i = 0; i <= offset; i++) {
+        printf("Writing to " FIB_DEV ", returned the sequence 1\n");
+    }
 
     for (int i = 0; i <= offset; i++) {
         lseek(fd, i, SEEK_SET);
@@ -32,27 +34,23 @@ int main()
         long long user_time =
             (t2.tv_sec - t1.tv_sec) * 1E9 + (t2.tv_nsec - t1.tv_nsec);
         printf("Reading from " FIB_DEV
-               " at offset %d, returned the sequence %lu, krtime is %lld, user "
-               "time is %lld, string size is %lu"
-               "\n",
-               i, sz, krtime, user_time, sz);
+               " at offset %d, returned the sequence "
+               "%s.\n",
+               i, buf);
         fprintf(fptr, "%d %lld %lld %lld \n", i, krtime, user_time,
                 user_time - krtime);
     }
 
-    /*   for (int i = offset; i >= 0; i--) {
-           lseek(fd, i, SEEK_SET);
-           sz = read(fd, buf, sizeof(buf));
-           buf[sz] = 0;
-           printf("Reading from " FIB_DEV
-                  " at offset %d, returned the sequence "
-                  "%s.\n",
-                  i, buf);
-           sz = write(fd, write_buf, strlen(write_buf));
-           printf("Writing to " FIB_DEV ", returned the sequence %lld\n", sz);
-       }
+    for (int i = offset; i >= 0; i--) {
+        lseek(fd, i, SEEK_SET);
+        uint64_t sz = read(fd, buf, sizeof(buf));
+        printf("Reading from " FIB_DEV
+               " at offset %d, returned the sequence "
+               "%s.\n",
+               i, buf);
+    }
 
-   */
+
     close(fd);
     return 0;
 }
