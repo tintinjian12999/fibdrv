@@ -8,7 +8,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
-
+#include "bignum.h"
 
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
@@ -62,60 +62,6 @@ static uint64_t fib_sequence(long long k, char *buf)
 }
 */
 
-
-static void str_reverse(char *str, size_t n)
-{
-    for (int i = 0; i < (n >> 1); i++)
-        XOR_SWAP(&str[i], &str[n - i - 1], char);
-}
-
-static void string_number_add(char *a, char *b, char *out)
-{
-    int carry = 0, sum, i = 0;
-    size_t a_len = strlen(a), b_len = strlen(b);
-    // Check string a is longer than string b
-    if (a_len < b_len) {
-        XOR_SWAP(a, b, char);
-        XOR_SWAP(&a_len, &b_len, size_t);
-    }
-    for (i = 0; i < b_len; i++) {
-        sum = (a[i] - '0') + (b[i] - '0') + carry;
-        out[i] = (sum % 10) + '0';
-        carry = sum / 10;
-    }
-    for (i = b_len; i < a_len; i++) {
-        sum = (a[i] - '0') + carry;
-        out[i] = (sum % 10) + '0';
-        carry = sum / 10;
-    }
-
-    if (carry)
-        out[i++] = carry + '0';
-    out[i] = '\0';
-}
-
-typedef struct str {
-    char numstr[256];
-} str_t;
-
-static long long fib_sequence(long long k, char *buf)
-{
-    int i = 0;
-    str_t *f = kmalloc((k + 2) * sizeof(str_t), GFP_KERNEL);
-    f[0].numstr[0] = '0';
-    f[0].numstr[1] = '\0';
-    f[1].numstr[0] = '1';
-    f[1].numstr[1] = '\0';
-
-    for (i = 2; i <= k; i++) {
-        string_number_add(f[i - 1].numstr, f[i - 2].numstr, f[i].numstr);
-    }
-    size_t f_size = strlen(f[k].numstr);
-    str_reverse(f[k].numstr, f_size);
-    if (copy_to_user(buf, f[k].numstr, f_size + 1))
-        return -EFAULT;
-    return f_size;
-}
 
 static uint64_t fib_time_proxy(long long k, char *buf)
 {
