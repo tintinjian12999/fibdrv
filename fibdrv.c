@@ -25,15 +25,8 @@ static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 static ktime_t kt;
+static size_t size;
 
-#define XOR_SWAP(a, b, type) \
-    do {                     \
-        type *__c = (a);     \
-        type *__d = (b);     \
-        *__c ^= *__d;        \
-        *__d ^= *__c;        \
-        *__c ^= *__d;        \
-    } while (0)
 /*
 static uint64_t fast_doubling(uint32_t target)
 {
@@ -46,29 +39,75 @@ static uint64_t fast_doubling(uint32_t target)
     return n * ((n1 << 1) - n);
 }
 */
-/*
-static uint64_t fib_sequence(long long k, char *buf)
+
+
+size_t string_fast_doubling(long long k, char *out)
 {
-    long long *f = kmalloc((k + 2) * sizeof(long long), GFP_KERNEL);
-
-    f[0] = 0;
-    f[1] = 1;
-
-    for (int i = 2; i <= k; i++) {
-        f[i] = f[i - 1] + f[i - 2];
+    char reg1[STR_NUM], reg2[STR_NUM], reg3[STR_NUM], reg4[STR_NUM];
+    static char result[STR_NUM];
+    if (k == 0) {
+        strncpy(out, "0", 2);
+        return 1;
+    } else if (k == 1) {
+        strncpy(out, "1", 2);
+        return 1;
+    } else if (k == 2) {
+        strncpy(out, "1", 2);
+        return 1;
     }
+    size = string_fast_doubling(k >> 1, reg1);
+    size = string_fast_doubling((k >> 1) + 1, reg2);
 
-    return f[k];
+    if (k & 1) {
+        string_mul(reg1, reg1, reg3);
+        string_mul(reg2, reg2, reg4);
+        string_add(reg4, reg3, result);
+    } else {
+        string_mul(reg2, "2", reg3);
+        string_sub(reg3, reg1, reg4);
+        string_mul(reg4, reg1, result);
+    }
+    size = strlen(result);
+    strncpy(out, result, size + 1);
+    return size;
 }
-*/
 
+
+typedef struct str {
+    char numstr[256];
+} str_t;
+
+
+size_t string_iterative(long long k, char *out)
+{
+    static int i = 0;
+    str_t *f = kmalloc((k + 2) * sizeof(str_t), GFP_KERNEL);
+    f[0].numstr[0] = '0';
+    f[0].numstr[1] = '\0';
+    f[1].numstr[0] = '1';
+    f[1].numstr[1] = '\0';
+
+    for (i = 2; i <= k; i++) {
+        string_add(f[i - 1].numstr, f[i - 2].numstr, f[i].numstr);
+    }
+    size = strlen(f[k].numstr);
+    str_reverse(f[k].numstr, size);
+    strncpy(out, f[k].numstr, size + 1);
+    return size;
+};
 
 static uint64_t fib_time_proxy(long long k, char *buf)
 {
+    char out[STR_NUM];
+
     kt = ktime_get();
-    long long result = fib_sequence(k, buf);
+    size = string_fast_doubling(k, out);
+    str_reverse(out, size);
+    // size = string_iterative(k, out);;
     kt = ktime_sub(ktime_get(), kt);
-    return result;
+    if (copy_to_user(buf, out, size + 1))
+        return -EFAULT;
+    return size;
 }
 
 static int fib_open(struct inode *inode, struct file *file)
