@@ -93,6 +93,7 @@ size_t string_iterative(long long k, char *out)
     size = strlen(f[k].numstr);
     str_reverse(f[k].numstr, size);
     strncpy(out, f[k].numstr, size + 1);
+    kfree(f);
     return size;
 };
 
